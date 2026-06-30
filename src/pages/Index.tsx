@@ -84,6 +84,21 @@ const Index = () => {
     );
   };
 
+  const addRoute = () => {
+    const newId = `route_${Date.now()}`;
+    setRoutes((prev) => [
+      ...prev,
+      { id: newId, city: 'Новый город', distance: 0, basePerKg: 0, basePerM3: 0, days: '1 день' },
+    ]);
+  };
+
+  const deleteRoute = (id: string) => {
+    setRoutes((prev) => prev.filter((r) => r.id !== id));
+    if (routeId === id && routes.length > 1) {
+      setRouteId(routes.find((r) => r.id !== id)?.id || '');
+    }
+  };
+
   const nav = [
     { label: 'Калькулятор', href: '#calc' },
     { label: 'Маршруты', href: '#routes' },
@@ -390,9 +405,9 @@ const Index = () => {
                     </Button>
                   </div>
                 ) : (
-                  <div className="py-2 space-y-4 max-h-[60vh] overflow-y-auto">
+                  <div className="py-2 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                     {routes.map((r) => (
-                      <div key={r.id} className="border border-border rounded-xl p-4">
+                      <div key={r.id} className="border border-border rounded-xl p-4 relative group">
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
                           <div>
                             <Label className="text-xs">Город</Label>
@@ -410,14 +425,31 @@ const Index = () => {
                             <Label className="text-xs">₽/м³</Label>
                             <Input type="number" value={r.basePerM3} onChange={(e) => updateRoute(r.id, 'basePerM3', e.target.value)} className="h-10" />
                           </div>
-                          <div>
-                            <Label className="text-xs">Срок</Label>
-                            <Input value={r.days} onChange={(e) => updateRoute(r.id, 'days', e.target.value)} className="h-10" />
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1">
+                              <Label className="text-xs">Срок</Label>
+                              <Input value={r.days} onChange={(e) => updateRoute(r.id, 'days', e.target.value)} className="h-10" />
+                            </div>
+                            <button
+                              onClick={() => deleteRoute(r.id)}
+                              className="h-10 w-10 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors shrink-0"
+                              title="Удалить маршрут"
+                            >
+                              <Icon name="Trash2" size={16} />
+                            </button>
                           </div>
                         </div>
                       </div>
                     ))}
-                    <p className="text-xs text-muted-foreground">
+                    <Button
+                      onClick={addRoute}
+                      variant="outline"
+                      className="w-full h-10 border-dashed font-600 text-accent border-accent/40 hover:bg-accent/5"
+                    >
+                      <Icon name="Plus" size={16} className="mr-2" />
+                      Добавить город / маршрут
+                    </Button>
+                    <p className="text-xs text-muted-foreground pt-1">
                       Изменения сразу применяются в калькуляторе и таблице тарифов.
                     </p>
                   </div>
