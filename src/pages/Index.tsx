@@ -551,7 +551,7 @@ const Index = () => {
               {[
                 { icon: 'Phone', l: 'Телефон', v: '8 383 310-38-68 · 8-983-310-38-68 · 8-913-893-26-24' },
                 { icon: 'Mail', l: 'Почта', v: 'merkury-avto@mail.ru' },
-                { icon: 'MapPin', l: 'Адрес', v: 'г. Новосибирск, ул. Транспортная, 1' },
+                { icon: 'MapPin', l: 'Адрес', v: 'г. Новосибирск, Троллейная, 87' },
                 { icon: 'Clock', l: 'Режим', v: 'Приём заявок 24/7' },
               ].map((c, i) => (
                 <div key={i} className="flex items-center gap-4">
