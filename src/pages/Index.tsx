@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ const HERO_IMG =
   'https://cdn.poehali.dev/projects/44c67291-4a40-49c5-a852-0311e0e1ed35/files/95aefc0c-ad96-4da5-a128-016d00f362fd.jpg';
 
 const ADMIN_PASSWORD = '1234';
+const API_URL = 'https://functions.poehali.dev/6520dd01-92a3-4897-8de2-2d3b0daea36d';
 
 type CargoType = {
   id: string;
@@ -112,6 +113,45 @@ const Index = () => {
   const [passInput, setPassInput] = useState('');
   const [adminTab, setAdminTab] = useState<'routes' | 'grid' | 'ranges'>('grid');
   const [adminRouteId, setAdminRouteId] = useState('kemerovo');
+  const [dbLoaded, setDbLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Загрузка тарифов из БД при старте
+  useEffect(() => {
+    fetch(API_URL)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.routes?.length) {
+          setRoutes(data.routes);
+          setAdminRouteId(data.routes[0].id);
+          setRouteId(data.routes[0].id);
+        }
+        if (data.weightRanges?.length) setWeightRanges(data.weightRanges);
+        if (data.volumeRanges?.length) setVolumeRanges(data.volumeRanges);
+        if (data.tariffGrid && Object.keys(data.tariffGrid).length) setTariffGrid(data.tariffGrid);
+        setDbLoaded(true);
+      })
+      .catch(() => setDbLoaded(true));
+  }, []);
+
+  // Сохранение тарифов в БД
+  const saveTariffs = useCallback(async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routes, weightRanges, volumeRanges, tariffGrid }),
+      });
+      const data = await res.json();
+      if (data.ok) toast({ title: 'Тарифы сохранены!', description: 'Данные записаны в базу данных.' });
+      else toast({ title: 'Ошибка сохранения', variant: 'destructive' });
+    } catch {
+      toast({ title: 'Ошибка соединения', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }, [routes, weightRanges, volumeRanges, tariffGrid]);
 
   // Найти диапазон по значению
   const findWeightRange = (w: number) =>
@@ -238,6 +278,17 @@ const Index = () => {
     { label: 'О компании', href: '#about' },
     { label: 'Контакты', href: '#contacts' },
   ];
+
+  if (!dbLoaded) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-muted-foreground">
+          <Icon name="Loader" size={32} className="animate-spin text-accent" />
+          <span className="text-sm">Загрузка тарифов...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -677,6 +728,18 @@ const Index = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Кнопка сохранения */}
+                    <div className="pt-4 border-t border-border flex items-center justify-between gap-4">
+                      <p className="text-xs text-muted-foreground">Нажмите «Сохранить» — изменения запишутся в базу данных и не пропадут.</p>
+                      <Button
+                        onClick={saveTariffs}
+                        disabled={saving}
+                        className="shrink-0 bg-accent hover:bg-accent/90 text-accent-foreground font-600 h-10 px-6"
+                      >
+                        {saving ? <><Icon name="Loader" size={16} className="mr-2 animate-spin" />Сохранение...</> : <><Icon name="Save" size={16} className="mr-2" />Сохранить</>}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </DialogContent>

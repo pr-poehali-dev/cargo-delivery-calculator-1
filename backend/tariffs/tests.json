@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "GET tariffs (empty DB)",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"routes": [], "weightRanges": [], "volumeRanges": [], "tariffGrid": {}},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
