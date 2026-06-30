@@ -29,10 +29,15 @@ type Route = {
   id: string;
   city: string;
   distance: number;
-  basePerKg: number;
-  basePerM3: number;
   days: string;
 };
+
+// Весовые диапазоны
+type WeightRange = { id: string; label: string; min: number; max: number };
+// Объёмные диапазоны
+type VolumeRange = { id: string; label: string; min: number; max: number };
+// Ячейка тарифной сетки: [routeId][weightId][volumeId] = цена
+type TariffGrid = Record<string, Record<string, Record<string, number>>>;
 
 const initialCargoTypes: CargoType[] = [
   { id: 'general', label: 'Обычный груз', icon: 'Package', multiplier: 1 },
@@ -42,37 +47,103 @@ const initialCargoTypes: CargoType[] = [
 ];
 
 const initialRoutes: Route[] = [
-  { id: 'kemerovo', city: 'Кемерово', distance: 270, basePerKg: 14, basePerM3: 1900, days: '1 день' },
-  { id: 'tomsk', city: 'Томск', distance: 210, basePerKg: 12, basePerM3: 1700, days: '1 день' },
-  { id: 'barnaul', city: 'Барнаул', distance: 230, basePerKg: 13, basePerM3: 1800, days: '1 день' },
-  { id: 'kuzbass', city: 'Кузбасс', distance: 300, basePerKg: 15, basePerM3: 2100, days: '1–2 дня' },
+  { id: 'kemerovo', city: 'Кемерово', distance: 270, days: '1 день' },
+  { id: 'tomsk', city: 'Томск', distance: 210, days: '1 день' },
+  { id: 'barnaul', city: 'Барнаул', distance: 230, days: '1 день' },
+  { id: 'kuzbass', city: 'Кузбасс', distance: 300, days: '1–2 дня' },
 ];
+
+const initialWeightRanges: WeightRange[] = [
+  { id: 'w1', label: '0.1–25 кг', min: 0.1, max: 25 },
+  { id: 'w2', label: '26–50 кг', min: 26, max: 50 },
+  { id: 'w3', label: '51–100 кг', min: 51, max: 100 },
+  { id: 'w4', label: '101–250 кг', min: 101, max: 250 },
+  { id: 'w5', label: '251–500 кг', min: 251, max: 500 },
+  { id: 'w6', label: '501–1000 кг', min: 501, max: 1000 },
+  { id: 'w7', label: 'более 1000 кг', min: 1001, max: Infinity },
+];
+
+const initialVolumeRanges: VolumeRange[] = [
+  { id: 'v1', label: '0.1–0.15 м³', min: 0.1, max: 0.15 },
+  { id: 'v2', label: '0.16–0.3 м³', min: 0.16, max: 0.3 },
+  { id: 'v3', label: '0.31–0.5 м³', min: 0.31, max: 0.5 },
+  { id: 'v4', label: '0.51–1 м³', min: 0.51, max: 1 },
+  { id: 'v5', label: '1.01–3 м³', min: 1.01, max: 3 },
+  { id: 'v6', label: 'более 3 м³', min: 3.01, max: Infinity },
+];
+
+// Генерируем начальную тарифную сетку (примерные цены)
+const generateInitialGrid = (routes: Route[], wRanges: WeightRange[], vRanges: VolumeRange[]): TariffGrid => {
+  const basePrices: Record<string, number> = {
+    kemerovo: 1400, tomsk: 1200, barnaul: 1300, kuzbass: 1600,
+  };
+  const grid: TariffGrid = {};
+  routes.forEach((r) => {
+    grid[r.id] = {};
+    wRanges.forEach((w, wi) => {
+      grid[r.id][w.id] = {};
+      vRanges.forEach((v, vi) => {
+        const base = basePrices[r.id] ?? 1500;
+        grid[r.id][w.id][v.id] = Math.round(base * (1 + wi * 0.15) * (1 + vi * 0.12));
+      });
+    });
+  });
+  return grid;
+};
 
 const Index = () => {
   const [routes, setRoutes] = useState<Route[]>(initialRoutes);
   const [cargoTypes] = useState<CargoType[]>(initialCargoTypes);
+  const [weightRanges, setWeightRanges] = useState<WeightRange[]>(initialWeightRanges);
+  const [volumeRanges, setVolumeRanges] = useState<VolumeRange[]>(initialVolumeRanges);
+  const [tariffGrid, setTariffGrid] = useState<TariffGrid>(() =>
+    generateInitialGrid(initialRoutes, initialWeightRanges, initialVolumeRanges)
+  );
 
   const [routeId, setRouteId] = useState('kemerovo');
   const [cargoId, setCargoId] = useState('general');
-  const [weight, setWeight] = useState('500');
-  const [volume, setVolume] = useState('2');
+  const [weight, setWeight] = useState('15');
+  const [volume, setVolume] = useState('0.12');
 
   const [adminOpen, setAdminOpen] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [passInput, setPassInput] = useState('');
+  const [adminTab, setAdminTab] = useState<'routes' | 'grid' | 'ranges'>('grid');
+  const [adminRouteId, setAdminRouteId] = useState('kemerovo');
+
+  // Найти диапазон по значению
+  const findWeightRange = (w: number) =>
+    weightRanges.find((r) => w >= r.min && w <= r.max);
+  const findVolumeRange = (v: number) =>
+    volumeRanges.find((r) => v >= r.min && v <= r.max);
 
   const result = useMemo(() => {
-    const route = routes.find((r) => r.id === routeId);
     const cargo = cargoTypes.find((c) => c.id === cargoId);
-    if (!route || !cargo) return 0;
+    if (!cargo) return null;
     const w = parseFloat(weight) || 0;
     const v = parseFloat(volume) || 0;
-    const byWeight = w * route.basePerKg;
-    const byVolume = v * route.basePerM3;
-    return Math.round(Math.max(byWeight, byVolume) * cargo.multiplier);
-  }, [routes, cargoTypes, routeId, cargoId, weight, volume]);
+    const wr = findWeightRange(w);
+    const vr = findVolumeRange(v);
+    if (!wr || !vr) return null;
+    const price = tariffGrid[routeId]?.[wr.id]?.[vr.id];
+    if (!price) return null;
+    return Math.round(price * cargo.multiplier);
+  }, [tariffGrid, routeId, cargoId, weight, volume, weightRanges, volumeRanges, cargoTypes]);
 
   const selectedRoute = routes.find((r) => r.id === routeId);
+
+  const updateTariffCell = (routeId: string, wId: string, vId: string, value: string) => {
+    setTariffGrid((prev) => ({
+      ...prev,
+      [routeId]: {
+        ...prev[routeId],
+        [wId]: {
+          ...prev[routeId]?.[wId],
+          [vId]: Number(value) || 0,
+        },
+      },
+    }));
+  };
 
   const updateRoute = (id: string, field: keyof Route, value: string) => {
     setRoutes((prev) =>
@@ -86,17 +157,75 @@ const Index = () => {
 
   const addRoute = () => {
     const newId = `route_${Date.now()}`;
-    setRoutes((prev) => [
-      ...prev,
-      { id: newId, city: 'Новый город', distance: 0, basePerKg: 0, basePerM3: 0, days: '1 день' },
-    ]);
+    const newRoute: Route = { id: newId, city: 'Новый город', distance: 0, days: '1 день' };
+    setRoutes((prev) => [...prev, newRoute]);
+    // Добавляем строки в сетку
+    const newGrid = { ...tariffGrid, [newId]: {} };
+    weightRanges.forEach((w) => {
+      newGrid[newId][w.id] = {};
+      volumeRanges.forEach((v) => { newGrid[newId][w.id][v.id] = 0; });
+    });
+    setTariffGrid(newGrid);
   };
 
   const deleteRoute = (id: string) => {
     setRoutes((prev) => prev.filter((r) => r.id !== id));
-    if (routeId === id && routes.length > 1) {
-      setRouteId(routes.find((r) => r.id !== id)?.id || '');
-    }
+    if (routeId === id) setRouteId(routes.find((r) => r.id !== id)?.id || '');
+    const newGrid = { ...tariffGrid };
+    delete newGrid[id];
+    setTariffGrid(newGrid);
+  };
+
+  const addWeightRange = () => {
+    const newId = `w_${Date.now()}`;
+    const newWr: WeightRange = { id: newId, label: 'Новый диапазон', min: 0, max: 0 };
+    setWeightRanges((prev) => [...prev, newWr]);
+    const newGrid = { ...tariffGrid };
+    routes.forEach((r) => {
+      if (!newGrid[r.id]) newGrid[r.id] = {};
+      newGrid[r.id][newId] = {};
+      volumeRanges.forEach((v) => { newGrid[r.id][newId][v.id] = 0; });
+    });
+    setTariffGrid(newGrid);
+  };
+
+  const addVolumeRange = () => {
+    const newId = `v_${Date.now()}`;
+    const newVr: VolumeRange = { id: newId, label: 'Новый диапазон', min: 0, max: 0 };
+    setVolumeRanges((prev) => [...prev, newVr]);
+    const newGrid = { ...tariffGrid };
+    routes.forEach((r) => {
+      if (!newGrid[r.id]) newGrid[r.id] = {};
+      weightRanges.forEach((w) => {
+        if (!newGrid[r.id][w.id]) newGrid[r.id][w.id] = {};
+        newGrid[r.id][w.id][newId] = 0;
+      });
+    });
+    setTariffGrid(newGrid);
+  };
+
+  const deleteWeightRange = (id: string) => {
+    setWeightRanges((prev) => prev.filter((w) => w.id !== id));
+  };
+
+  const deleteVolumeRange = (id: string) => {
+    setVolumeRanges((prev) => prev.filter((v) => v.id !== id));
+  };
+
+  const updateWeightRange = (id: string, field: keyof WeightRange, value: string) => {
+    setWeightRanges((prev) =>
+      prev.map((w) =>
+        w.id === id ? { ...w, [field]: field === 'label' ? value : Number(value) } : w
+      )
+    );
+  };
+
+  const updateVolumeRange = (id: string, field: keyof VolumeRange, value: string) => {
+    setVolumeRanges((prev) =>
+      prev.map((v) =>
+        v.id === id ? { ...v, [field]: field === 'label' ? value : Number(value) } : v
+      )
+    );
   };
 
   const nav = [
@@ -131,10 +260,7 @@ const Index = () => {
               </a>
             ))}
           </nav>
-          <a
-            href="tel:+73833103868"
-            className="hidden sm:flex items-center gap-2 text-sm font-600"
-          >
+          <a href="tel:+73833103868" className="hidden sm:flex items-center gap-2 text-sm font-600">
             <Icon name="Phone" size={16} className="text-accent" />
             8 383 310-38-68
           </a>
@@ -199,15 +325,10 @@ const Index = () => {
       <section id="calc" className="py-24 grid-texture">
         <div className="container">
           <div className="max-w-2xl mb-12">
-            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">
-              Калькулятор
-            </div>
-            <h2 className="font-display font-700 text-4xl md:text-5xl mb-4">
-              Расчёт стоимости доставки
-            </h2>
+            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">Калькулятор</div>
+            <h2 className="font-display font-700 text-4xl md:text-5xl mb-4">Расчёт стоимости доставки</h2>
             <p className="text-muted-foreground text-lg">
-              Укажите параметры груза — система мгновенно посчитает цену по тарифам
-              транспортной компании.
+              Укажите параметры груза — система подберёт тариф по весовому и объёмному диапазону.
             </p>
           </div>
 
@@ -222,9 +343,7 @@ const Index = () => {
                       key={r.id}
                       onClick={() => setRouteId(r.id)}
                       className={`p-3 rounded-xl border-2 text-left transition-all ${
-                        routeId === r.id
-                          ? 'border-accent bg-accent/5'
-                          : 'border-border hover:border-accent/40'
+                        routeId === r.id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
                       }`}
                     >
                       <div className="font-600 text-sm">{r.city}</div>
@@ -243,16 +362,10 @@ const Index = () => {
                       key={c.id}
                       onClick={() => setCargoId(c.id)}
                       className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all ${
-                        cargoId === c.id
-                          ? 'border-accent bg-accent/5'
-                          : 'border-border hover:border-accent/40'
+                        cargoId === c.id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
                       }`}
                     >
-                      <Icon
-                        name={c.icon}
-                        size={22}
-                        className={cargoId === c.id ? 'text-accent' : 'text-muted-foreground'}
-                      />
+                      <Icon name={c.icon} size={22} className={cargoId === c.id ? 'text-accent' : 'text-muted-foreground'} />
                       <span className="text-xs font-500 text-center leading-tight">{c.label}</span>
                     </button>
                   ))}
@@ -263,54 +376,57 @@ const Index = () => {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="weight" className="font-600 mb-2 block">Вес, кг</Label>
-                  <Input
-                    id="weight"
-                    type="number"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="h-12 text-lg"
-                  />
+                  <Input id="weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-12 text-lg" />
+                  {weight && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Диапазон: <span className="font-600 text-foreground">{findWeightRange(parseFloat(weight))?.label ?? '—'}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="volume" className="font-600 mb-2 block">Объём, м³</Label>
-                  <Input
-                    id="volume"
-                    type="number"
-                    value={volume}
-                    onChange={(e) => setVolume(e.target.value)}
-                    className="h-12 text-lg"
-                  />
+                  <Input id="volume" type="number" step="0.01" value={volume} onChange={(e) => setVolume(e.target.value)} className="h-12 text-lg" />
+                  {volume && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Диапазон: <span className="font-600 text-foreground">{findVolumeRange(parseFloat(volume))?.label ?? '—'}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* result */}
             <div className="lg:col-span-2 bg-primary text-primary-foreground rounded-2xl p-8 flex flex-col">
-              <div className="text-primary-foreground/60 text-sm uppercase tracking-wider mb-2">
-                Стоимость доставки
-              </div>
+              <div className="text-primary-foreground/60 text-sm uppercase tracking-wider mb-2">Стоимость доставки</div>
               <div className="font-display font-700 text-5xl mb-1 text-accent">
-                {result.toLocaleString('ru-RU')} ₽
+                {result !== null ? `${result.toLocaleString('ru-RU')} ₽` : '—'}
               </div>
               <div className="text-primary-foreground/60 text-sm mb-8">
                 Новосибирск → {selectedRoute?.city}
               </div>
-
+              {result === null && (
+                <p className="text-xs text-primary-foreground/50 mb-4">
+                  Введите вес и объём в пределах доступных диапазонов
+                </p>
+              )}
               <div className="space-y-3 text-sm border-t border-primary-foreground/15 pt-6 mb-8">
+                <div className="flex justify-between">
+                  <span className="text-primary-foreground/60">Весовой диапазон</span>
+                  <span className="font-600">{findWeightRange(parseFloat(weight))?.label ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-primary-foreground/60">Объёмный диапазон</span>
+                  <span className="font-600">{findVolumeRange(parseFloat(volume))?.label ?? '—'}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-primary-foreground/60">Срок доставки</span>
                   <span className="font-600">{selectedRoute?.days}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-primary-foreground/60">Расстояние</span>
-                  <span className="font-600">{selectedRoute?.distance} км</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-primary-foreground/60">Тип груза</span>
                   <span className="font-600">{cargoTypes.find((c) => c.id === cargoId)?.label}</span>
                 </div>
               </div>
-
               <Button
                 onClick={() => toast({ title: 'Заявка отправлена!', description: 'Менеджер свяжется с вами для подтверждения.' })}
                 className="mt-auto bg-accent hover:bg-accent/90 text-accent-foreground font-600 h-12"
@@ -330,9 +446,7 @@ const Index = () => {
         <div className="container">
           <div className="flex items-end justify-between flex-wrap gap-4 mb-12">
             <div>
-              <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">
-                География
-              </div>
+              <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">География</div>
               <h2 className="font-display font-700 text-4xl md:text-5xl">Маршруты доставки</h2>
             </div>
             <p className="text-muted-foreground max-w-sm">
@@ -341,10 +455,7 @@ const Index = () => {
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {routes.map((r) => (
-              <div
-                key={r.id}
-                className="group bg-background border border-border rounded-2xl p-6 hover:border-accent transition-all hover:-translate-y-1"
-              >
+              <div key={r.id} className="group bg-background border border-border rounded-2xl p-6 hover:border-accent transition-all hover:-translate-y-1">
                 <div className="flex items-center justify-between mb-6">
                   <Icon name="MapPin" size={24} className="text-accent" />
                   <span className="text-xs font-600 px-2 py-1 bg-secondary rounded-full">{r.days}</span>
@@ -353,7 +464,7 @@ const Index = () => {
                 <div className="font-display font-700 text-2xl mb-4">{r.city}</div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Icon name="Route" size={15} />
-                  {r.distance} км · от {r.basePerKg} ₽/кг
+                  {r.distance} км
                 </div>
               </div>
             ))}
@@ -366,11 +477,12 @@ const Index = () => {
         <div className="container">
           <div className="flex items-end justify-between flex-wrap gap-4 mb-12">
             <div>
-              <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">
-                Прайс-лист
-              </div>
+              <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">Прайс-лист</div>
               <h2 className="font-display font-700 text-4xl md:text-5xl">Тарифы и цены</h2>
+              <p className="text-muted-foreground mt-2">Стоимость в рублях · Новосибирск → город</p>
             </div>
+
+            {/* ADMIN DIALOG */}
             <Dialog open={adminOpen} onOpenChange={(o) => { setAdminOpen(o); if (!o) { setAuthorized(false); setPassInput(''); } }}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="font-600">
@@ -378,17 +490,15 @@ const Index = () => {
                   Панель редактирования
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl">
+              <DialogContent className="max-w-5xl w-full">
                 <DialogHeader>
                   <DialogTitle className="font-display text-2xl">
                     {authorized ? 'Редактирование тарифов' : 'Вход для сотрудников'}
                   </DialogTitle>
                 </DialogHeader>
                 {!authorized ? (
-                  <div className="py-4 space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Введите пароль для управления тарифами и маршрутами.
-                    </p>
+                  <div className="py-4 space-y-4 max-w-sm">
+                    <p className="text-sm text-muted-foreground">Введите пароль для управления тарифами и маршрутами.</p>
                     <Input
                       type="password"
                       placeholder="Пароль (по умолчанию 1234)"
@@ -405,89 +515,217 @@ const Index = () => {
                     </Button>
                   </div>
                 ) : (
-                  <div className="py-2 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                    {routes.map((r) => (
-                      <div key={r.id} className="border border-border rounded-xl p-4 relative group">
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
-                          <div>
-                            <Label className="text-xs">Город</Label>
-                            <Input value={r.city} onChange={(e) => updateRoute(r.id, 'city', e.target.value)} className="h-10" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Км</Label>
-                            <Input type="number" value={r.distance} onChange={(e) => updateRoute(r.id, 'distance', e.target.value)} className="h-10" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">₽/кг</Label>
-                            <Input type="number" value={r.basePerKg} onChange={(e) => updateRoute(r.id, 'basePerKg', e.target.value)} className="h-10" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">₽/м³</Label>
-                            <Input type="number" value={r.basePerM3} onChange={(e) => updateRoute(r.id, 'basePerM3', e.target.value)} className="h-10" />
-                          </div>
-                          <div className="flex gap-2 items-end">
-                            <div className="flex-1">
-                              <Label className="text-xs">Срок</Label>
-                              <Input value={r.days} onChange={(e) => updateRoute(r.id, 'days', e.target.value)} className="h-10" />
-                            </div>
+                  <div className="py-2">
+                    {/* Вкладки панели */}
+                    <div className="flex gap-2 mb-6 border-b border-border">
+                      {([
+                        { id: 'grid', label: 'Тарифная сетка', icon: 'Table' },
+                        { id: 'routes', label: 'Маршруты', icon: 'MapPin' },
+                        { id: 'ranges', label: 'Диапазоны', icon: 'SlidersHorizontal' },
+                      ] as { id: 'grid' | 'routes' | 'ranges'; label: string; icon: string }[]).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setAdminTab(t.id)}
+                          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-600 border-b-2 -mb-px transition-colors ${
+                            adminTab === t.id ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <Icon name={t.icon} size={15} />
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* --- Вкладка: Тарифная сетка --- */}
+                    {adminTab === 'grid' && (
+                      <div className="space-y-4">
+                        {/* Выбор маршрута */}
+                        <div className="flex gap-2 flex-wrap">
+                          {routes.map((r) => (
                             <button
-                              onClick={() => deleteRoute(r.id)}
-                              className="h-10 w-10 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors shrink-0"
-                              title="Удалить маршрут"
+                              key={r.id}
+                              onClick={() => setAdminRouteId(r.id)}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-600 border-2 transition-all ${
+                                adminRouteId === r.id ? 'border-accent bg-accent/5 text-accent' : 'border-border text-muted-foreground hover:border-accent/40'
+                              }`}
                             >
-                              <Icon name="Trash2" size={16} />
+                              {r.city}
                             </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Редактируйте цены (₽) для маршрута <b>Новосибирск → {routes.find(r => r.id === adminRouteId)?.city}</b></p>
+                        <div className="overflow-auto max-h-[50vh] border border-border rounded-xl">
+                          <table className="text-sm w-full">
+                            <thead className="sticky top-0 bg-secondary z-10">
+                              <tr>
+                                <th className="p-2 text-left font-600 text-xs border-r border-border min-w-[110px]">Вес \ Объём</th>
+                                {volumeRanges.map((v) => (
+                                  <th key={v.id} className="p-2 text-center font-600 text-xs min-w-[90px] border-r border-border last:border-r-0">{v.label}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {weightRanges.map((w) => (
+                                <tr key={w.id} className="border-t border-border">
+                                  <td className="p-2 font-600 text-xs bg-secondary/50 border-r border-border">{w.label}</td>
+                                  {volumeRanges.map((v) => (
+                                    <td key={v.id} className="p-1 border-r border-border last:border-r-0">
+                                      <input
+                                        type="number"
+                                        value={tariffGrid[adminRouteId]?.[w.id]?.[v.id] ?? 0}
+                                        onChange={(e) => updateTariffCell(adminRouteId, w.id, v.id, e.target.value)}
+                                        className="w-full h-8 px-2 text-center text-sm border border-border rounded-md bg-background focus:outline-none focus:border-accent"
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Цены применяются к характеру груза умножением на коэффициент.</p>
+                      </div>
+                    )}
+
+                    {/* --- Вкладка: Маршруты --- */}
+                    {adminTab === 'routes' && (
+                      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                        {routes.map((r) => (
+                          <div key={r.id} className="border border-border rounded-xl p-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                              <div>
+                                <Label className="text-xs">Город</Label>
+                                <Input value={r.city} onChange={(e) => updateRoute(r.id, 'city', e.target.value)} className="h-10" />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Км</Label>
+                                <Input type="number" value={r.distance} onChange={(e) => updateRoute(r.id, 'distance', e.target.value)} className="h-10" />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Срок</Label>
+                                <Input value={r.days} onChange={(e) => updateRoute(r.id, 'days', e.target.value)} className="h-10" />
+                              </div>
+                              <button
+                                onClick={() => deleteRoute(r.id)}
+                                className="h-10 w-10 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
+                              >
+                                <Icon name="Trash2" size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <Button onClick={addRoute} variant="outline" className="w-full h-10 border-dashed font-600 text-accent border-accent/40 hover:bg-accent/5">
+                          <Icon name="Plus" size={16} className="mr-2" />
+                          Добавить маршрут
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* --- Вкладка: Диапазоны --- */}
+                    {adminTab === 'ranges' && (
+                      <div className="grid md:grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto pr-1">
+                        {/* Весовые */}
+                        <div>
+                          <p className="font-600 text-sm mb-3 flex items-center gap-2">
+                            <Icon name="Weight" size={15} className="text-accent" />
+                            Весовые диапазоны (кг)
+                          </p>
+                          <div className="space-y-2">
+                            {weightRanges.map((w) => (
+                              <div key={w.id} className="flex gap-2 items-center">
+                                <Input value={w.label} onChange={(e) => updateWeightRange(w.id, 'label', e.target.value)} className="h-9 flex-1 text-xs" placeholder="Название" />
+                                <button
+                                  onClick={() => deleteWeightRange(w.id)}
+                                  className="h-9 w-9 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors shrink-0"
+                                >
+                                  <Icon name="X" size={14} />
+                                </button>
+                              </div>
+                            ))}
+                            <Button onClick={addWeightRange} variant="outline" className="w-full h-9 border-dashed text-xs font-600 text-accent border-accent/40 hover:bg-accent/5">
+                              <Icon name="Plus" size={14} className="mr-1" />
+                              Добавить диапазон
+                            </Button>
+                          </div>
+                        </div>
+                        {/* Объёмные */}
+                        <div>
+                          <p className="font-600 text-sm mb-3 flex items-center gap-2">
+                            <Icon name="Box" size={15} className="text-accent" />
+                            Объёмные диапазоны (м³)
+                          </p>
+                          <div className="space-y-2">
+                            {volumeRanges.map((v) => (
+                              <div key={v.id} className="flex gap-2 items-center">
+                                <Input value={v.label} onChange={(e) => updateVolumeRange(v.id, 'label', e.target.value)} className="h-9 flex-1 text-xs" placeholder="Название" />
+                                <button
+                                  onClick={() => deleteVolumeRange(v.id)}
+                                  className="h-9 w-9 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors shrink-0"
+                                >
+                                  <Icon name="X" size={14} />
+                                </button>
+                              </div>
+                            ))}
+                            <Button onClick={addVolumeRange} variant="outline" className="w-full h-9 border-dashed text-xs font-600 text-accent border-accent/40 hover:bg-accent/5">
+                              <Icon name="Plus" size={14} className="mr-1" />
+                              Добавить диапазон
+                            </Button>
                           </div>
                         </div>
                       </div>
-                    ))}
-                    <Button
-                      onClick={addRoute}
-                      variant="outline"
-                      className="w-full h-10 border-dashed font-600 text-accent border-accent/40 hover:bg-accent/5"
-                    >
-                      <Icon name="Plus" size={16} className="mr-2" />
-                      Добавить город / маршрут
-                    </Button>
-                    <p className="text-xs text-muted-foreground pt-1">
-                      Изменения сразу применяются в калькуляторе и таблице тарифов.
-                    </p>
+                    )}
                   </div>
                 )}
               </DialogContent>
             </Dialog>
           </div>
 
-          <div className="overflow-x-auto border border-border rounded-2xl">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-secondary text-left">
-                  <th className="font-600 text-sm p-4">Направление</th>
-                  <th className="font-600 text-sm p-4">Расстояние</th>
-                  <th className="font-600 text-sm p-4">Цена за кг</th>
-                  <th className="font-600 text-sm p-4">Цена за м³</th>
-                  <th className="font-600 text-sm p-4">Срок</th>
-                </tr>
-              </thead>
-              <tbody>
-                {routes.map((r) => (
-                  <tr key={r.id} className="border-t border-border hover:bg-secondary/40 transition-colors">
-                    <td className="p-4 font-600">Новосибирск → {r.city}</td>
-                    <td className="p-4 text-muted-foreground">{r.distance} км</td>
-                    <td className="p-4"><span className="text-accent font-600">{r.basePerKg} ₽</span></td>
-                    <td className="p-4"><span className="text-accent font-600">{r.basePerM3} ₽</span></td>
-                    <td className="p-4 text-muted-foreground">{r.days}</td>
+          {/* Публичная тарифная сетка — по вкладкам городов */}
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap border-b border-border pb-2">
+              {routes.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setAdminRouteId(r.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-600 transition-all ${
+                    adminRouteId === r.id ? 'bg-accent text-accent-foreground' : 'bg-secondary text-foreground hover:bg-secondary/70'
+                  }`}
+                >
+                  {r.city}
+                </button>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto border border-border rounded-2xl">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary">
+                    <th className="p-3 text-left font-600 border-r border-border">Вес \ Объём</th>
+                    {volumeRanges.map((v) => (
+                      <th key={v.id} className="p-3 text-center font-600 border-r border-border last:border-r-0 text-xs">{v.label}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 text-sm text-muted-foreground flex flex-wrap gap-x-6 gap-y-1">
-            {cargoTypes.map((c) => (
-              <span key={c.id}>
-                {c.label}: <span className="font-600 text-foreground">×{c.multiplier}</span>
-              </span>
-            ))}
+                </thead>
+                <tbody>
+                  {weightRanges.map((w) => (
+                    <tr key={w.id} className="border-t border-border hover:bg-secondary/30 transition-colors">
+                      <td className="p-3 font-600 text-xs bg-secondary/40 border-r border-border">{w.label}</td>
+                      {volumeRanges.map((v) => {
+                        const price = tariffGrid[adminRouteId]?.[w.id]?.[v.id];
+                        return (
+                          <td key={v.id} className="p-3 text-center border-r border-border last:border-r-0">
+                            <span className="text-accent font-600">{price ? price.toLocaleString('ru-RU') + ' ₽' : '—'}</span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Новосибирск → <b>{routes.find(r => r.id === adminRouteId)?.city}</b> · Для хрупкого ×1.3, скоропортящегося ×1.5, опасного ×1.8
+            </p>
           </div>
         </div>
       </section>
@@ -496,9 +734,7 @@ const Index = () => {
       <section id="about" className="py-24 bg-primary text-primary-foreground">
         <div className="container grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">
-              О компании
-            </div>
+            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">О компании</div>
             <h2 className="font-display font-700 text-4xl md:text-5xl mb-6">
               Логистика, на которую можно положиться
             </h2>
@@ -541,12 +777,8 @@ const Index = () => {
       <section id="contacts" className="py-24">
         <div className="container grid lg:grid-cols-2 gap-16">
           <div>
-            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">
-              Контакты
-            </div>
-            <h2 className="font-display font-700 text-4xl md:text-5xl mb-8">
-              Свяжитесь с нами
-            </h2>
+            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">Контакты</div>
+            <h2 className="font-display font-700 text-4xl md:text-5xl mb-8">Свяжитесь с нами</h2>
             <div className="space-y-5">
               {[
                 { icon: 'Phone', l: 'Телефон', v: '8 383 310-38-68 · 8-983-310-38-68 · 8-913-893-26-24' },
