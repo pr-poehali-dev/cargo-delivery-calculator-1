@@ -232,6 +232,7 @@ const Index = () => {
     { label: 'Калькулятор', href: '#calc' },
     { label: 'Маршруты', href: '#routes' },
     { label: 'Тарифы', href: '#tariffs' },
+    { label: 'Негабарит', href: '#extra' },
     { label: 'О компании', href: '#about' },
     { label: 'Контакты', href: '#contacts' },
   ];
@@ -726,6 +727,82 @@ const Index = () => {
             <p className="text-xs text-muted-foreground">
               Новосибирск → <b>{routes.find(r => r.id === adminRouteId)?.city}</b> · Для хрупкого ×1.3, скоропортящегося ×1.5, опасного ×1.8
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* EXTRA SERVICES */}
+      <section id="extra" className="py-24 bg-card border-y border-border">
+        <div className="container">
+          <div className="max-w-2xl mb-12">
+            <div className="text-accent font-600 text-sm uppercase tracking-wider mb-3">Дополнительные услуги</div>
+            <h2 className="font-display font-700 text-4xl md:text-5xl mb-4">Перевозка негабарита</h2>
+            <p className="text-muted-foreground text-lg">
+              Решаем даже сложные задачи и перевозим нестандартный груз.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-10">
+            {/* Что принимаем */}
+            <div>
+              <h3 className="font-display font-600 text-xl mb-5 flex items-center gap-2">
+                <Icon name="PackageCheck" size={22} className="text-accent" />
+                Принимаем к перевозке
+              </h3>
+              <div className="space-y-3">
+                {[
+                  'Грузовое место весом более 200 кг, не упакованное на паллету (паллета — поддон с размерами не более 1,2×0,8 м, пригодный для транспортировки гидравлической тележкой; груз не выступает за габариты паллеты).',
+                  'Грузовое место весом более 1000 кг, упакованное на паллету (паллета — поддон с размерами не более 1,2×0,8 м; груз не выступает за габариты паллеты).',
+                  'Грузовое место, длина которого более 2,9 м.',
+                  'Грузовое место объёмом более 2,5 м³.',
+                ].map((t, i) => (
+                  <div key={i} className="flex gap-3 p-4 bg-background border border-border rounded-xl">
+                    <div className="w-6 h-6 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-accent text-xs font-700">{i + 1}</span>
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed">{t}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Надбавки */}
+            <div>
+              <h3 className="font-display font-600 text-xl mb-5 flex items-center gap-2">
+                <Icon name="TrendingUp" size={22} className="text-accent" />
+                Надбавки к тарифу
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { surcharge: '+30%', condition: 'Стандартный негабаритный груз', note: 'При перевозке негабаритного груза' },
+                  { surcharge: '+50%', condition: 'Длина грузового места от 4,5 до 7 м', note: null },
+                  { surcharge: '+50%', condition: 'Вес одного грузового места от 1500 до 2000 кг', note: 'Возможность организации перевозки по согласованию' },
+                  { surcharge: '+100%', condition: 'Длина грузового места более 7 м', note: null },
+                  { surcharge: '+100%', condition: 'Вес одного грузового места более 2000 кг', note: 'Возможность организации перевозки по согласованию' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4 p-4 bg-background border border-border rounded-xl items-start">
+                    <div className="shrink-0 bg-accent text-accent-foreground font-display font-700 text-sm px-3 py-1.5 rounded-lg min-w-[60px] text-center">
+                      {item.surcharge}
+                    </div>
+                    <div>
+                      <p className="text-sm font-600 text-foreground">{item.condition}</p>
+                      {item.note && <p className="text-xs text-muted-foreground mt-1">{item.note}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 p-5 bg-accent/5 border border-accent/20 rounded-2xl flex gap-4 items-start">
+            <Icon name="Phone" size={22} className="text-accent shrink-0 mt-0.5" />
+            <div>
+              <p className="font-600 text-foreground mb-1">Нужна перевозка нестандартного груза?</p>
+              <p className="text-sm text-muted-foreground">
+                Свяжитесь с нами для уточнения условий и стоимости перевозки негабаритных грузов по телефону{' '}
+                <a href="tel:+73833103868" className="text-accent font-600 hover:underline">8 383 310-38-68</a>
+              </p>
+            </div>
           </div>
         </div>
       </section>
