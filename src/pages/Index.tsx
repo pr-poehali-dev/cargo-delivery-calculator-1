@@ -102,7 +102,7 @@ const Index = () => {
               <Icon name="Truck" size={20} className="text-accent-foreground" />
             </div>
             <span className="font-display font-700 text-xl tracking-tight">
-              ВИТЭК<span className="text-accent">.</span>
+              Меркурий-Авто <span className="text-accent">ГТК</span>
             </span>
           </a>
           <nav className="hidden md:flex items-center gap-8">
@@ -471,7 +471,7 @@ const Index = () => {
               Логистика, на которую можно положиться
             </h2>
             <p className="text-primary-foreground/70 text-lg mb-8">
-              ВИТЭК — транспортная компания из Новосибирска, специализирующаяся на
+              Меркурий-Авто ГТК — транспортная компания из Новосибирска, специализирующаяся на
               автогрузоперевозках по Сибирскому региону. Собственный автопарк,
               опытные водители и страхование каждого груза.
             </p>
@@ -571,10 +571,10 @@ const Index = () => {
               <Icon name="Truck" size={18} className="text-accent-foreground" />
             </div>
             <span className="font-display font-700 text-lg text-primary-foreground">
-              ВИТЭК<span className="text-accent">.</span>
+              Меркурий-Авто <span className="text-accent">ГТК</span>
             </span>
           </div>
-          <p className="text-sm">© 2026 ВИТЭК Логистик. Автогрузоперевозки по Сибири.</p>
+          <p className="text-sm">© 2026 Меркурий-Авто ГТК. Автогрузоперевозки по Сибири.</p>
         </div>
       </footer>
     </div>
