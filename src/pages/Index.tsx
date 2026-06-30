@@ -117,11 +117,11 @@ const Index = () => {
             ))}
           </nav>
           <a
-            href="tel:+73833000000"
+            href="tel:+73833103868"
             className="hidden sm:flex items-center gap-2 text-sm font-600"
           >
             <Icon name="Phone" size={16} className="text-accent" />
-            +7 (383) 300-00-00
+            8 383 310-38-68
           </a>
         </div>
       </header>
@@ -517,7 +517,7 @@ const Index = () => {
             </h2>
             <div className="space-y-5">
               {[
-                { icon: 'Phone', l: 'Телефон', v: '+7 (383) 300-00-00' },
+                { icon: 'Phone', l: 'Телефон', v: '8 383 310-38-68 · 8-983-310-38-68 · 8-913-893-26-24' },
                 { icon: 'Mail', l: 'Почта', v: 'info@vitek-logistic.ru' },
                 { icon: 'MapPin', l: 'Адрес', v: 'г. Новосибирск, ул. Транспортная, 1' },
                 { icon: 'Clock', l: 'Режим', v: 'Приём заявок 24/7' },
