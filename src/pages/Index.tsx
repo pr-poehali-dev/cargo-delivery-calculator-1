@@ -57,10 +57,12 @@ const initialWeightRanges: WeightRange[] = [
   { id: 'w1', label: '0.1–25 кг', min: 0.1, max: 25 },
   { id: 'w2', label: '26–50 кг', min: 26, max: 50 },
   { id: 'w3', label: '51–100 кг', min: 51, max: 100 },
-  { id: 'w4', label: '101–250 кг', min: 101, max: 250 },
-  { id: 'w5', label: '251–500 кг', min: 251, max: 500 },
-  { id: 'w6', label: '501–1000 кг', min: 501, max: 1000 },
-  { id: 'w7', label: 'более 1000 кг', min: 1001, max: Infinity },
+  ...Array.from({ length: 18 }, (_, i) => {
+    const from = 101 + i * 50;
+    const to = 150 + i * 50;
+    return { id: `w_s${i + 1}`, label: `${from}–${to} кг`, min: from, max: to };
+  }),
+  { id: 'w_over', label: 'более 1000 кг', min: 1001, max: Infinity },
 ];
 
 const initialVolumeRanges: VolumeRange[] = [
